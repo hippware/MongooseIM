@@ -449,7 +449,7 @@ set_roster_item(User, LUser, LServer, LJID, From, To, MakeItem2) ->
         end,
     case transaction(LServer, F) of
         {atomic, {OldItem, NewItem}} ->
-            push_item(User, LServer, To, NewItem),
+            push_item(User, LServer, To, OldItem, NewItem),
             case NewItem#roster.subscription of
                 remove ->
                     send_unsubscribing_presence(From, OldItem), ok;
@@ -497,20 +497,24 @@ process_item_els(Item, [{xmlcdata, _} | Els]) ->
     process_item_els(Item, Els);
 process_item_els(Item, []) -> Item.
 
-push_item(User, Server, From, Item) ->
+push_item(User, Server, From, OldItem = #roster{}, NewItem = #roster{}) ->
     ejabberd_sm:route(jid:make(<<"">>, <<"">>, <<"">>),
                       jid:make(User, Server, <<"">>),
-                      {broadcast, {item, Item#roster.jid, Item#roster.subscription}}),
+                      {broadcast, {item,
+                                   NewItem#roster.jid,
+                                   NewItem#roster.subscription,
+                                   OldItem, NewItem}}),
     case roster_versioning_enabled(Server) of
         true ->
-            push_item_version(Server, User, From, Item,
+            push_item_version(Server, User, From, NewItem,
                               roster_version(Server, jid:nodeprep(User)));
         false ->
             lists:foreach(fun (Resource) ->
-                                  push_item(User, Server, Resource, From, Item)
+                                  push_item(User, Server, Resource,
+                                            From, NewItem)
                           end,
                           ejabberd_sm:get_user_resources(User, Server))
-    end.
+    end;
 
 push_item(User, Server, Resource, From, Item) ->
     ejabberd_hooks:run(roster_push, Server, [From, Item]),
@@ -644,10 +648,11 @@ process_subscription(Direction, User, Server, JID1, Type, Reason) ->
                     ejabberd_router:route(jid:make(User, Server, <<"">>), JID1, PresenceStanza)
             end,
             case Push of
-                {push, #roster{ subscription = none, ask = in }} ->
+                {push, _, #roster{ subscription = none, ask = in }} ->
                     true;
-                {push, Item} ->
-                    push_item(User, Server, jid:make(User, Server, <<"">>), Item),
+                {push, OldItem, NewItem} ->
+                    push_item(User, Server, jid:make(User, Server, <<"">>),
+                              OldItem, NewItem),
                     true;
                 none -> false
             end;
@@ -699,7 +704,7 @@ process_subscription_transaction(Direction, LUser, LServer, LJID, Type, Reason) 
                 true -> write_roster_version_t(LUser, LServer);
                 false -> ok
             end,
-            {{push, NewItem}, AutoReply}
+            {{push, Item, NewItem}, AutoReply}
     end.
 
 %% in_state_change(Subscription, Pending, Type) -> NewState

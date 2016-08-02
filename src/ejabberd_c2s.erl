@@ -1401,7 +1401,10 @@ handle_routed_iq(_From, _To, Acc, IQ, StateData)
                               StateData :: state()) ->
     {mongoose_acc:t(), broadcast_result()}.
 handle_routed_broadcast(Acc, {item, IJID, ISubscription}, StateData) ->
-    {Acc2, NewState} = roster_change(Acc, IJID, ISubscription, StateData),
+    {Acc2, NewState} = roster_change(Acc, IJID, ISubscription, none, none, StateData),
+    {Acc2, {new_state, NewState}};
+handle_routed_broadcast(Acc, {item, IJID, ISubscription, OldItem, NewItem}, StateData) ->
+    {Acc2, NewState} = roster_change(Acc, IJID, ISubscription, OldItem, NewItem, StateData),
     {Acc2, {new_state, NewState}};
 handle_routed_broadcast(Acc, {exit, Reason}, _StateData) ->
     {Acc, {exit, Reason}};
@@ -2251,8 +2254,9 @@ presence_broadcast_first(Acc0, From, StateData, Packet) ->
 -spec roster_change(Acc :: mongoose_acc:t(),
                     IJID :: ejabberd:simple_jid() | ejabberd:jid(),
                     ISubscription :: from | to | both | none,
+                    OldItem :: term(), NewItem :: term(),
                     State :: state()) -> {mongoose_acc:t(), state()}.
-roster_change(Acc, IJID, ISubscription, StateData) ->
+roster_change(Acc, IJID, ISubscription, OldItem, NewItem, StateData) ->
     LIJID = jid:to_lower(IJID),
     IsSubscribedToMe = (ISubscription == both) or (ISubscription == from),
     AmISubscribedTo = (ISubscription == both) or (ISubscription == to),
@@ -2276,6 +2280,14 @@ roster_change(Acc, IJID, ISubscription, StateData) ->
             ?DEBUG("roster changed for ~p~n", [StateData#state.user]),
             From = StateData#state.jid,
             To = jid:make(IJID),
+
+            % Changes that cause contacts to be newly blocked by privacy lists
+            % should generate an unavailable message for that contact
+            case is_contact_newly_blocked(StateData, From, To, OldItem, NewItem) of
+                true -> ejabberd_router:route(From, To, unavailable_packet());
+                false -> ok
+            end,
+
             IsntInvisible = not StateData#state.pres_invis,
             ImAvailableTo = gb_sets:is_element(LIJID, StateData#state.pres_a),
             ImInvisibleTo = gb_sets:is_element(LIJID, StateData#state.pres_i),
@@ -2633,10 +2645,27 @@ maybe_update_presence(Acc, StateData = #state{jid = JID, pres_f = Froms}, NewLis
               send_unavail_if_newly_blocked(Ac, StateData, jid:make(T), NewList)
       end, Acc, FromsExceptSelf).
 
+is_contact_newly_blocked(_, _, _, OldItem, NewItem) when OldItem =:= none;
+                                                         NewItem =:= none ->
+    false;
+is_contact_newly_blocked(StateData, From, To, OldItem, NewItem) ->
+    OldResult = privacy_check_packet_roster(StateData, From, To, OldItem),
+    NewResult = privacy_check_packet_roster(StateData, From, To, NewItem),
+    {OldResult, NewResult} =:= {allow, deny}.
+
+privacy_check_packet_roster(StateData, From, To, Item) ->
+    ejabberd_hooks:run_fold(
+      privacy_check_packet_with_roster, StateData#state.server,
+      allow,
+      [StateData#state.user,
+       StateData#state.server,
+       StateData#state.privacy_list,
+       {From, To, unavailable_packet()},
+       out, Item]).
+
 send_unavail_if_newly_blocked(Acc, StateData = #state{jid = JID},
                               ContactJID, NewList) ->
-    Packet = #xmlel{name = <<"presence">>,
-                    attrs = [{<<"type">>, <<"unavailable">>}]},
+    Packet = unavailable_packet(),
     %% WARNING: we can not use accumulator to cache privacy check result - this is
     %% the only place where the list to check against changes
     OldResult = privacy_check_packet(Packet, JID, ContactJID, out, StateData),
@@ -3314,3 +3343,5 @@ setup_accum(Acc, StateData) ->
     Server = StateData#state.server,
     mongoose_acc:update(Acc, #{server => Server, user => User}).
 
+unavailable_packet() ->
+    #xmlel{name = <<"presence">>, attrs = [{<<"type">>, <<"unavailable">>}]}.
