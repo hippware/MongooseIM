@@ -1310,7 +1310,9 @@ handle_routed_iq(_From, _To, #xmlel{attrs = Attrs}, IQ, StateData)
 -spec handle_routed_broadcast(Broadcast :: broadcast_type(), StateData :: state()) ->
     broadcast_result().
 handle_routed_broadcast({item, IJID, ISubscription}, StateData) ->
-    {new_state, roster_change(IJID, ISubscription, StateData)};
+    {new_state, roster_change(IJID, ISubscription, none, none, StateData)};
+handle_routed_broadcast({item, IJID, ISubscription, OldItem, NewItem}, StateData) ->
+    {new_state, roster_change(IJID, ISubscription, OldItem, NewItem, StateData)};
 handle_routed_broadcast({exit, Reason}, _StateData) ->
     {exit, Reason};
 handle_routed_broadcast({privacy_list, PrivList, PrivListName}, StateData) ->
@@ -2085,8 +2087,9 @@ presence_broadcast_first(From, StateData, Packet) ->
 
 -spec roster_change(IJID :: ejabberd:simple_jid() | ejabberd:jid(),
                     ISubscription :: from | to | both | none,
+                    OldItem :: term(), NewItem :: term(),
                     State :: state()) -> state().
-roster_change(IJID, ISubscription, StateData) ->
+roster_change(IJID, ISubscription, OldItem, NewItem, StateData) ->
     LIJID = jid:to_lower(IJID),
     IsSubscribedToMe = (ISubscription == both) or (ISubscription == from),
     AmISubscribedTo = (ISubscription == both) or (ISubscription == to),
@@ -2110,6 +2113,14 @@ roster_change(IJID, ISubscription, StateData) ->
             ?DEBUG("roster changed for ~p~n", [StateData#state.user]),
             From = StateData#state.jid,
             To = jid:make(IJID),
+
+            % Changes that cause contacts to be newly blocked by privacy lists
+            % should generate an unavailable message for that contact
+            case is_contact_newly_blocked(StateData, From, To, OldItem, NewItem) of
+                true -> ejabberd_router:route(From, To, unavailable_packet());
+                false -> ok
+            end,
+
             IsntInvisible = not StateData#state.pres_invis,
             ImAvailableTo = gb_sets:is_element(LIJID, StateData#state.pres_a),
             ImInvisibleTo = gb_sets:is_element(LIJID, StateData#state.pres_i),
@@ -2125,6 +2136,7 @@ roster_change(IJID, ISubscription, StateData) ->
                     StateData#state{pres_a = A,
                                     pres_f = FSet,
                                     pres_t = TSet};
+
                 {_, true} ->
                     ?DEBUG("become_unavailable_to: ~p~n", [LIJID]),
                     PU = #xmlel{name = <<"presence">>,
@@ -2430,10 +2442,27 @@ maybe_update_presence(StateData = #state{jid = JID, pres_f = Froms}, NewList) ->
               ok
       end, ok, FromsExceptSelf).
 
+is_contact_newly_blocked(_, _, _, OldItem, NewItem) when OldItem =:= none;
+                                                         NewItem =:= none ->
+    false;
+is_contact_newly_blocked(StateData, From, To, OldItem, NewItem) ->
+    OldResult = privacy_check_packet_roster(StateData, From, To, OldItem),
+    NewResult = privacy_check_packet_roster(StateData, From, To, NewItem),
+    {OldResult, NewResult} =:= {allow, deny}.
+
+privacy_check_packet_roster(StateData, From, To, Item) ->
+    ejabberd_hooks:run_fold(
+      privacy_check_packet_with_roster, StateData#state.server,
+      allow,
+      [StateData#state.user,
+       StateData#state.server,
+       StateData#state.privacy_list,
+       {From, To, unavailable_packet()},
+       out, Item]).
+
 send_unavail_if_newly_blocked(StateData = #state{jid = JID},
                               ContactJID, NewList) ->
-    Packet = #xmlel{name = <<"presence">>,
-                    attrs = [{<<"type">>, <<"unavailable">>}]},
+    Packet = unavailable_packet(),
     OldResult = privacy_check_packet(StateData,
                                      JID, ContactJID, Packet, out),
     NewResult = privacy_check_packet(StateData#state{privacy_list = NewList},
@@ -3090,3 +3119,6 @@ terminate_when_tls_required_but_not_enabled(true, false, StateData, _El) ->
 terminate_when_tls_required_but_not_enabled(_, _, StateData, El) ->
     process_unauthenticated_stanza(StateData, El),
     fsm_next_state(wait_for_feature_before_auth, StateData).
+
+unavailable_packet() ->
+    #xmlel{name = <<"presence">>, attrs = [{<<"type">>, <<"unavailable">>}]}.
