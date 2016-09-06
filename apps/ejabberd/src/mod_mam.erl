@@ -482,6 +482,7 @@ handle_lookup_messages(
     RSM   = fix_rsm(jlib:rsm_decode(QueryEl)),
     Borders = borders_decode(QueryEl),
     Limit = elem_to_limit(QueryEl),
+    Reverse = elem_to_reverse(QueryEl),
     PageSize = min(max_result_limit(),
                    maybe_integer(Limit, default_result_limit())),
     LimitPassed = Limit =/= <<>>,
@@ -505,7 +506,7 @@ handle_lookup_messages(
                           message_row_to_ext_id(lists:last(MessageRows))}
             end,
         [send_message(ArcJID, From, message_row_to_xml(MamNs, M, QueryID))
-         || M <- MessageRows],
+         || M <- maybe_reverse(Reverse, MessageRows)],
         ResultSetEl = result_set(FirstMessID, LastMessID, Offset, TotalCount),
         ResultQueryEl = result_query(ResultSetEl, Namespace),
         %% On receiving the query, the server pushes to the client a series of
@@ -537,6 +538,7 @@ handle_set_message_form(
     Limit = elem_to_limit(QueryEl),
     PageSize = min(max_result_limit(),
                    maybe_integer(Limit, default_result_limit())),
+    Reverse = form_to_reverse(QueryEl),
     %% Whether or not the client query included a <set/> element,
     %% the server MAY simply return its limited results.
     %% So, disable 'policy-violation'.
@@ -562,7 +564,7 @@ handle_set_message_form(
                           message_row_to_ext_id(lists:last(MessageRows))}
             end,
         [send_message(ArcJID, From, message_row_to_xml(MamNs, set_client_xmlns_for_row(M), QueryID))
-         || M <- MessageRows],
+         || M <- maybe_reverse(Reverse, MessageRows)],
 
         %% Make fin message
         IsLastPage = is_last_page(PageSize, TotalCount, Offset, MessageRows),
@@ -582,7 +584,7 @@ handle_set_message_form(
                           message_row_to_ext_id(lists:last(MessageRows))}
             end,
         [send_message(ArcJID, From, message_row_to_xml(MamNs, set_client_xmlns_for_row(M), QueryID))
-         || M <- MessageRows],
+         || M <- maybe_reverse(Reverse, MessageRows)],
 
         %% Make fin iq
         IsLastPage = is_last_page(PageSize, TotalCount, Offset, MessageRows),
@@ -880,6 +882,20 @@ elem_to_limit(QueryEl) ->
         [{elem, <<"set">>}, {elem, <<"limit">>}, cdata]
     ]).
 
+elem_to_reverse(El) ->
+    cdata_to_bool(xml:get_path_s(El, [{elem, <<"reverse">>}, cdata])).
+
+cdata_to_bool(<<"true">>) -> true;
+cdata_to_bool(<<"1">>) -> true;
+cdata_to_bool(_) -> false.
+
+-spec form_to_reverse(jlib:xmlel()) -> boolean().
+form_to_reverse(El) ->
+    case form_field_value_s(El, <<"reverse">>) of
+        <<"1">> -> true;
+        <<"true">> -> true;
+        _ -> false
+    end.
 
 -spec form_to_start_microseconds(_) -> 'undefined' | non_neg_integer().
 form_to_start_microseconds(El) ->
@@ -970,6 +986,10 @@ report_issue(Reason, Stacktrace, Issue, #jid{lserver=LServer, luser=LUser}, IQ) 
     ?ERROR_MSG("issue=~p, server=~p, user=~p, reason=~p, iq=~p, stacktrace=~p",
                [Issue, LServer, LUser, Reason, IQ, Stacktrace]).
 
+maybe_reverse(true, List) ->
+    lists:reverse(List);
+maybe_reverse(false, List) ->
+    List.
 
 %% ----------------------------------------------------------------------
 %% Dynamic params module
