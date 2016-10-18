@@ -444,6 +444,8 @@ rsm_parse_element(#xmlel{name = <<"index">>, attrs = []}=Elem, RsmIn) ->
     IndexStr = xml:get_tag_cdata(Elem),
     {Index, _} = string:to_integer(binary_to_list(IndexStr)),
     RsmIn#rsm_in{index=Index};
+rsm_parse_element(#xmlel{name = <<"reverse">>, attrs = []}, RsmIn) ->
+    RsmIn#rsm_in{reverse=true};
 rsm_parse_element(_, RsmIn)->
     RsmIn.
 
