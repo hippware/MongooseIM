@@ -340,7 +340,8 @@
                  direction   :: before | aft | undefined,
                 %% id is empty, if cdata does not exist
                  id          :: binary() | integer() | undefined,
-                 index       :: non_neg_integer() | undefined | error
+                 index       :: non_neg_integer() | undefined | error,
+                 reverse = false :: boolean()
                 }).
 
 -record(mam_borders, {after_id  :: non_neg_integer() | undefined,

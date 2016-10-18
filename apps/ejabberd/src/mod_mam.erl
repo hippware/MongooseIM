@@ -482,7 +482,6 @@ handle_lookup_messages(
     RSM   = fix_rsm(jlib:rsm_decode(QueryEl)),
     Borders = borders_decode(QueryEl),
     Limit = elem_to_limit(QueryEl),
-    Reverse = elem_to_reverse(QueryEl),
     PageSize = min(max_result_limit(),
                    maybe_integer(Limit, default_result_limit())),
     LimitPassed = Limit =/= <<>>,
@@ -506,7 +505,7 @@ handle_lookup_messages(
                           message_row_to_ext_id(lists:last(MessageRows))}
             end,
         [send_message(ArcJID, From, message_row_to_xml(MamNs, M, QueryID))
-         || M <- maybe_reverse(Reverse, MessageRows)],
+         || M <- MessageRows],
         ResultSetEl = result_set(FirstMessID, LastMessID, Offset, TotalCount),
         ResultQueryEl = result_query(ResultSetEl, Namespace),
         %% On receiving the query, the server pushes to the client a series of
@@ -538,7 +537,6 @@ handle_set_message_form(
     Limit = elem_to_limit(QueryEl),
     PageSize = min(max_result_limit(),
                    maybe_integer(Limit, default_result_limit())),
-    Reverse = form_to_reverse(QueryEl),
     %% Whether or not the client query included a <set/> element,
     %% the server MAY simply return its limited results.
     %% So, disable 'policy-violation'.
@@ -564,7 +562,7 @@ handle_set_message_form(
                           message_row_to_ext_id(lists:last(MessageRows))}
             end,
         [send_message(ArcJID, From, message_row_to_xml(MamNs, set_client_xmlns_for_row(M), QueryID))
-         || M <- maybe_reverse(Reverse, MessageRows)],
+         || M <- MessageRows],
 
         %% Make fin message
         IsLastPage = is_last_page(PageSize, TotalCount, Offset, MessageRows),
@@ -584,7 +582,7 @@ handle_set_message_form(
                           message_row_to_ext_id(lists:last(MessageRows))}
             end,
         [send_message(ArcJID, From, message_row_to_xml(MamNs, set_client_xmlns_for_row(M), QueryID))
-         || M <- maybe_reverse(Reverse, MessageRows)],
+         || M <- MessageRows],
 
         %% Make fin iq
         IsLastPage = is_last_page(PageSize, TotalCount, Offset, MessageRows),
