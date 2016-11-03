@@ -2,7 +2,7 @@
 
 {application, ejabberd,
  [{description, "ejabberd"},
-  {vsn, {cmd, "echo 2.1.8+mim-`../../tools/generate_vsn.sh`"}},
+  {vsn, {cmd, "echo 2.1.8+mim-2.0.0beta1"}},
   {modules, []},
   {registered, [
                ]},
