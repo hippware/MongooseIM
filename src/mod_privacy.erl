@@ -353,6 +353,8 @@ check_packet(Acc, User, Server,
 %% allow error messages
 check_packet_aux(_, message, <<"error">>, _JID, _Subscription, _Groups) ->
     allow;
+check_packet_aux(_, message_out, _Type, _JID, _Subscription, _Groups) ->
+    allow;
 %% if we run of of list items then it is allowed
 check_packet_aux([], _PType, _MType, _JID, _Subscription, _Groups) ->
     allow;
