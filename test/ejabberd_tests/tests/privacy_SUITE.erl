@@ -396,12 +396,12 @@ block_jid_message(Config) ->
         timer:sleep(?SLEEP_TIME),
         escalus_assert:has_no_stanzas(Alice),
 
-        %% now Alice try to send a msg to Bob, whom she had blocked, and gets error
+        %% Blocking only applies to incoming messages, so Alice can still send
+        %% Bob a message
         %% and Bob gets nothing
         escalus_client:send(Alice, escalus_stanza:chat_to(Bob, <<"Hi, Bobbb!">>)),
-        privacy_helper:gets_error(Alice, <<"not-acceptable">>),
-        timer:sleep(?SLEEP_TIME),
-        escalus_assert:has_no_stanzas(Bob)
+        escalus_assert:is_chat_message(<<"Hi, Bobbb!">>,
+            escalus_client:wait_for_stanza(Bob))
 
         end).
 
@@ -464,9 +464,9 @@ allow_subscription_to_from_message(Config) ->
 
         ct:sleep(?SLEEP_TIME),
         %% they received just rejection msgs
-        privacy_helper:gets_error(Alice, <<"not-acceptable">>),
+        privacy_helper:gets_error(Alice, <<"service-unavailable">>),
         escalus_assert:has_no_stanzas(Alice),
-        privacy_helper:gets_error(Bob, <<"not-acceptable">>),
+        privacy_helper:gets_error(Bob, <<"service-unavailable">>),
         escalus_assert:has_no_stanzas(Bob),
 
         %% Alice subscribes to Bob
@@ -515,8 +515,8 @@ allow_subscription_both_message(Config) ->
         escalus_client:send(Alice, escalus_stanza:chat_to(bob, <<"Hi, Bob XYZ!">>)),
 
         ct:sleep(?SLEEP_TIME),
-        privacy_helper:gets_error(Alice, <<"not-acceptable">>),
-        privacy_helper:gets_error(Bob, <<"not-acceptable">>),
+        privacy_helper:gets_error(Alice, <<"service-unavailable">>),
+        privacy_helper:gets_error(Bob, <<"service-unavailable">>),
         escalus_assert:has_no_stanzas(Alice),
         escalus_assert:has_no_stanzas(Bob),
 
