@@ -138,9 +138,11 @@ handle(Host, Module, Function, Opts, From, To, IQ) ->
 -spec process_iq(Host :: ejabberd:server(), Module :: atom(), Function :: atom(),
                  From :: ejabberd:jid(), To :: ejabberd:jid(),
                  IQ :: ejabberd:iq()) -> 'ok' | {'error','lager_not_running'}.
-process_iq(_Host, Module, Function, From, To, IQ) ->
+process_iq(Host, Module, Function, From, To, IQ) ->
     case catch Module:Function(From, To, IQ) of
         {'EXIT', Reason} ->
+            ejabberd_hooks:run_fold(iq_handler_crash, Host,
+                                    {From, To, IQ, Reason}),
             send_iq_error_response(From, To, Reason, IQ),
             ?ERROR_MSG("IQ Handler crash: ~p -> ~p - ~p : ~p",
                        [From, To, IQ, Reason]);
