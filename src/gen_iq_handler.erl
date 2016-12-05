@@ -142,8 +142,7 @@ handle(Host, Module, Function, Opts, From, To, Acc, IQ) ->
 process_iq(Host, Module, Function, From, To, Acc, IQ) ->
     case catch Module:Function(From, To, Acc, IQ) of
         {'EXIT', Reason} ->
-            ejabberd_hooks:run_fold(iq_handler_crash, Host,
-                                    {From, To, IQ, Reason}),
+            ejabberd_hooks:run(iq_handler_crash, Host, [From, To, IQ, Reason]),
             send_iq_error_response(From, To, Reason, IQ),
             ?ERROR_MSG("IQ Handler crash: ~p -> ~p - ~p : ~p",
                        [From, To, IQ, Reason]);
