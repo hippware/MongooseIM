@@ -946,6 +946,11 @@ session_established({xmlstreamelement, El}, StateData) ->
                                               to_jid => ToJID,
                                               to => To}),
             Acc1 = ejabberd_hooks:run_fold(c2s_preprocessing_hook, Server, Acc, [NewState]),
+            ejabberd_hooks:run(stanza_sent,
+                               FromJID#jid.lserver,
+                               [StateData#state.jid,
+                                StateData#state.ip,
+                                El]),
             case mongoose_acc:get(result, Acc1, undefined) of
                 drop -> fsm_next_state(session_established, NewState);
                 _ -> process_outgoing_stanza(Acc1, NewState)
@@ -2786,7 +2791,12 @@ resend_csi_buffer(State) ->
 
 -spec ship_to_local_user(mongoose_acc:t(), packet(), state()) ->
     {ok | resume, mongoose_acc:t(), state()}.
-ship_to_local_user(Acc, Packet, State) ->
+ship_to_local_user(Acc, Packet = {_From, To, Element}, State) ->
+    ejabberd_hooks:run(stanza_received,
+                       To#jid.lserver,
+                       [State#state.jid,
+                        State#state.ip,
+                        Element]),
     maybe_csi_inactive_optimisation(Acc, Packet, State).
 
 -spec maybe_csi_inactive_optimisation(mongoose_acc:t(), packet(), state()) ->
