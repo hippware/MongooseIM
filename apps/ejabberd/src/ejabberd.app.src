@@ -2,15 +2,17 @@
 
 {application, ejabberd,
  [{description, "ejabberd"},
-  {vsn, {cmd, "echo 2.1.8+mim-2.0.0beta1"}},
+  {vsn, "2.1.8+mim-2.0.0"},
   {modules, []},
-  {registered, [
-               ]},
-  {applications, [kernel, stdlib, inets, sasl, mnesia, ssl,
-                  stringprep, exml, cowboy, exometer]},
+  {registered, []},
+  {applications, [kernel, stdlib, inets, sasl, mnesia, ssl, compiler, xmerl,
+                  syntax_tools, asn1, crypto, public_key, runtime_tools,
+                  lager, goldrush, syslog, lager_syslog, fusco, stringprep,
+                  exml, cowboy, exometer, p1_utils, ranch, cowlib, bear,
+                  mochijson2, cache_tab, usec, base16, cuesport, alarms, idna,
+                  recon, poolboy, setup, exometer_core, jiffy, redo, riakc]},
   {env, []},
   {mod, {ejabberd_app, []}}]}.
-
 
 %% Local Variables:
 %% mode: erlang
