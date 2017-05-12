@@ -10,7 +10,8 @@
                   lager, goldrush, syslog, lager_syslog, fusco, stringprep,
                   exml, cowboy, exometer, p1_utils, ranch, cowlib, bear,
                   mochijson2, cache_tab, usec, base16, cuesport, alarms, idna,
-                  recon, poolboy, setup, exometer_core, jiffy, redo, riakc]},
+                  recon, setup, exometer_core, jiffy, redo, fast_tls, lasse,
+                  p1_pgsql]},
   {env, []},
   {mod, {ejabberd_app, []}}]}.
 
