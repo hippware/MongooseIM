@@ -714,6 +714,9 @@ terminate(Reason, Name, Msg, Mod, StateName, StateData, Debug) ->
 	    case Reason of
 		normal ->
 		    exit(normal);
+        {normal, _} ->
+            % gen_server call to process which exited normally before replying
+            exit(normal);
 		shutdown ->
 		    exit(shutdown);
 		priority_shutdown ->
