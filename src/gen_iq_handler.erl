@@ -164,6 +164,8 @@ send_iq_error_response(From, To, Reason, IQ) ->
             ejabberd_router:route(
               To, From,
               make_error(IQ, ?ERR_INTERNAL_SERVER_ERROR));
+        crash ->
+            exit(Reason);
         _ ->
             ok
     end.
