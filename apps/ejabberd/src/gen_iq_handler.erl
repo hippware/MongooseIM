@@ -167,7 +167,7 @@ send_iq_error_response(From, To, Reason, IQ) ->
               To, From,
               make_error(IQ, ?ERR_INTERNAL_SERVER_ERROR));
         crash ->
-            exit(Reason);
+            error(Reason);
         _ ->
             ok
     end.
