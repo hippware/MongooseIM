@@ -26,7 +26,6 @@
 -include("ejabberd.hrl").
 -include("jlib.hrl").
 
--record(sm_session, {smid, sid}).
 
 %%
 %% `gen_mod' callbacks
@@ -34,18 +33,18 @@
 
 start(Host, _Opts) ->
     ?INFO_MSG("mod_stream_management starting", []),
-    ejabberd_hooks:add(c2s_stream_features, Host, ?MODULE, add_sm_feature, 50),
-    ejabberd_hooks:add(sm_remove_connection_hook, Host, ?MODULE, remove_smid, 50),
-    ejabberd_hooks:add(session_cleanup, Host, ?MODULE, session_cleanup, 50),
-    mnesia:create_table(sm_session, [{ram_copies, [node()]},
-                                     {attributes, record_info(fields, sm_session)}]),
-    mnesia:add_table_index(sm_session, sid),
-    mnesia:add_table_copy(sm_session, node(), ram_copies).
+    ejabberd_hooks:add(c2s_stream_features, Host,
+                       ?MODULE, add_sm_feature, 50),
+    ejabberd_hooks:add(sm_remove_connection_hook, Host,
+                       ?MODULE, remove_smid, 50),
+    ejabberd_hooks:add(session_cleanup, Host, ?MODULE, session_cleanup, 50).
 
 stop(Host) ->
-    ?INFO_MSG("mod_stream_management stopping", []),
-    ejabberd_hooks:delete(sm_remove_connection_hook, Host, ?MODULE, remove_smid, 50),
-    ejabberd_hooks:delete(c2s_stream_features, Host, ?MODULE, add_sm_feature, 50),
+    ?INFO_MSG("mod_redis_stream_management stopping", []),
+    ejabberd_hooks:delete(sm_remove_connection_hook, Host,
+                          ?MODULE, remove_smid, 50),
+    ejabberd_hooks:delete(c2s_stream_features, Host,
+                          ?MODULE, add_sm_feature, 50),
     ejabberd_hooks:delete(session_cleanup, Host, ?MODULE, session_cleanup, 50).
 
 %%
@@ -60,15 +59,17 @@ sm() ->
            attrs = [{<<"xmlns">>, ?NS_STREAM_MGNT_3}]}.
 
 remove_smid(SID, _JID, _Info, _Reason) ->
-    case mnesia:dirty_index_read(sm_session, SID, #sm_session.sid) of
-        [] ->
-            ok;
-        [#sm_session{} = SMSession] ->
-            mnesia:sync_dirty(fun mnesia:delete_object/1, [SMSession])
-    end.
+    case ejabberd_redis:cmd(["GET", sid(SID)]) of
+        undefined -> ok;
+        SMID -> ejabberd_redis:cmd(["DEL", smid(SMID)])
+    end,
+    ejabberd_redis:cmd(["DEL", sid(SID)]),
+    ok.
 
--spec session_cleanup(LUser :: ejabberd:luser(), LServer :: ejabberd:lserver(),
-                      LResource :: ejabberd:lresource(), SID :: ejabberd_sm:sid()) -> any().
+-spec session_cleanup(LUser :: ejabberd:luser(),
+                      LServer :: ejabberd:lserver(),
+                      LResource :: ejabberd:lresource(),
+                      SID :: ejabberd_sm:sid()) -> any().
 session_cleanup(_LUser, _LServer, _LResource, SID) ->
     remove_smid(SID, undefined, undefined, undefined).
 
@@ -119,25 +120,25 @@ set_resume_timeout(ResumeTimeout) ->
 %%
 
 register_smid(SMID, SID) ->
-    try
-        mnesia:sync_dirty(fun mnesia:write/1,
-                          [#sm_session{smid = SMID, sid = SID}]),
-        ok
-    catch exit:Reason ->
-              {error, Reason}
-    end.
+    ejabberd_redis:cmd([["SET", sid(SID), SMID],
+                        ["SET", smid(SMID), term_to_binary(SID)]]),
+    ok.
 
 get_sid(SMID) ->
-    case mnesia:dirty_read(sm_session, SMID) of
-        [#sm_session{sid = SID}] ->
-            [SID];
-        [] ->
-            []
+    case ejabberd_redis:cmd(["GET", smid(SMID)]) of
+        undefined -> [];
+        SID -> [binary_to_term(SID)]
     end.
 
 %%
 %% Helpers
 %%
+
+sid(SID) ->
+    ["sid:", term_to_binary(SID)].
+
+smid(SMID) ->
+    ["smid:", SMID].
 
 %% copy-n-paste from gen_mod.erl
 -record(ejabberd_module, {module_host, opts}).
