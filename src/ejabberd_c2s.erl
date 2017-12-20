@@ -2281,11 +2281,18 @@ roster_change(Acc, IJID, ISubscription, OldItem, NewItem, StateData) ->
             From = StateData#state.jid,
             To = jid:make(IJID),
 
-            % Changes that cause contacts to be newly blocked by privacy lists
-            % should generate an unavailable message for that contact
-            case is_contact_newly_blocked(StateData, From, To, OldItem, NewItem) of
-                true -> ejabberd_router:route(From, To, unavailable_packet());
-                false -> ok
+            case contact_blocking_change(StateData, From, To, OldItem, NewItem) of
+                blocked ->
+                    % Changes that cause contacts to be newly blocked by privacy
+                    % lists should generate an unavailable message for that
+                    % contact
+                    ejabberd_router:route(From, To, unavailable_packet());
+                unblocked when WasSubscribedToMe andalso IsSubscribedToMe ->
+                    % Changes that unblock an existing subscriber should send
+                    % them a presence update
+                    ejabberd_router:route(From, To, StateData#state.pres_last);
+                _ ->
+                    ok
             end,
 
             IsntInvisible = not StateData#state.pres_invis,
@@ -2634,6 +2641,9 @@ flush_messages(N, Acc) ->
 %%% XEP-0016
 %%%----------------------------------------------------------------------
 
+%----------------------------------------------------------------------
+% Called when a privacy list is updated
+%----------------------------------------------------------------------
 maybe_update_presence(Acc, StateData = #state{jid = JID, pres_f = Froms}, NewList) ->
     % Our own jid is added to pres_f, even though we're not a "contact", so for
     % the purposes of this check we don't want it:
@@ -2644,24 +2654,6 @@ maybe_update_presence(Acc, StateData = #state{jid = JID, pres_f = Froms}, NewLis
       fun(T, Ac) ->
               send_unavail_if_newly_blocked(Ac, StateData, jid:make(T), NewList)
       end, Acc, FromsExceptSelf).
-
-is_contact_newly_blocked(_, _, _, OldItem, NewItem) when OldItem =:= none;
-                                                         NewItem =:= none ->
-    false;
-is_contact_newly_blocked(StateData, From, To, OldItem, NewItem) ->
-    OldResult = privacy_check_packet_roster(StateData, From, To, OldItem),
-    NewResult = privacy_check_packet_roster(StateData, From, To, NewItem),
-    {OldResult, NewResult} =:= {allow, deny}.
-
-privacy_check_packet_roster(StateData, From, To, Item) ->
-    ejabberd_hooks:run_fold(
-      privacy_check_packet_with_roster, StateData#state.server,
-      allow,
-      [StateData#state.user,
-       StateData#state.server,
-       StateData#state.privacy_list,
-       {From, To, unavailable_packet()},
-       out, Item]).
 
 send_unavail_if_newly_blocked(Acc, StateData = #state{jid = JID},
                               ContactJID, NewList) ->
@@ -2678,6 +2670,32 @@ send_unavail_if_newly_blocked(Acc, allow, deny, From, To, Packet) ->
     ejabberd_router:route(From, To, Acc, Packet);
 send_unavail_if_newly_blocked(Acc, _, _, _, _, _) ->
     Acc.
+
+%----------------------------------------------------------------------
+% Called when a roster item is updated
+%----------------------------------------------------------------------
+contact_blocking_change(_, _, _, OldItem, NewItem)
+  when OldItem =:= none;
+       NewItem =:= none ->
+    none;
+contact_blocking_change(StateData, From, To, OldItem, NewItem) ->
+    OldResult = privacy_check_packet_roster(StateData, From, To, OldItem),
+    NewResult = privacy_check_packet_roster(StateData, From, To, NewItem),
+    case {OldResult, NewResult} of
+        {allow, deny} -> blocked;
+        {deny, allow} -> unblocked;
+        _ -> none
+    end.
+
+privacy_check_packet_roster(StateData, From, To, Item) ->
+    ejabberd_hooks:run_fold(
+      privacy_check_packet_with_roster, StateData#state.server,
+      allow,
+      [StateData#state.user,
+       StateData#state.server,
+       StateData#state.privacy_list,
+       {From, To, unavailable_packet()},
+       out, Item]).
 
 %%%----------------------------------------------------------------------
 %%% XEP-0191
