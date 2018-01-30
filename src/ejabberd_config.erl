@@ -635,8 +635,6 @@ process_host_term(Term, Host, State) ->
             State;
         {odbc_pool, Pool} when is_atom(Pool) ->
             add_option({odbc_pool, Host}, Pool, State);
-        {riak_server, RiakConfig} ->
-            add_option(riak_server, RiakConfig, State);
         {cassandra_servers, CassandraConfig} ->
             add_option(cassandra_servers, CassandraConfig, State);
         {Opt, Val} ->
@@ -1032,8 +1030,6 @@ handle_config_change({_Key, _OldValue, _NewValue}) ->
 %% ----------------------------------------------------------------
 %% LOCAL CONFIG
 %% ----------------------------------------------------------------
-handle_local_config_add(#local_config{key = riak_server}) ->
-    mongoose_riak:start();
 handle_local_config_add(#local_config{key = cassandra_servers}) ->
     mongoose_cassandra:start();
 handle_local_config_add(#local_config{key = Key} = El) ->
@@ -1044,8 +1040,6 @@ handle_local_config_add(#local_config{key = Key} = El) ->
             ?WARNING_MSG("local config add ~p option unhandled", [El])
     end.
 
-handle_local_config_del(#local_config{key = riak_server}) ->
-    mongoose_riak:stop();
 handle_local_config_del(#local_config{key = cassandra_servers}) ->
     mongoose_cassandra:stop();
 handle_local_config_del(#local_config{key = node_start}) ->
@@ -1061,10 +1055,6 @@ handle_local_config_del(#local_config{key = Key} = El) ->
 
 handle_local_config_change({listen, Old, New}) ->
     reload_listeners(compare_listeners(Old, New));
-handle_local_config_change({riak_server, _Old, _New}) ->
-    mongoose_riak:stop(),
-    mongoose_riak:start(),
-    ok;
 handle_local_config_change({cassandra_servers, _Old, _New}) ->
     mongoose_cassandra:stop(),
     mongoose_cassandra:start(),
