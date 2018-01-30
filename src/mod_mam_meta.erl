@@ -95,23 +95,8 @@ valid_core_mod_opts(mod_mam) ->
 valid_core_mod_opts(mod_mam_muc) ->
     [add_archived_element, is_archivable_message, host, extra_lookup_params, full_text_search].
 
--spec parse_backend_opts(odbc | cassandra, Type :: pm | muc,
+-spec parse_backend_opts(odbc, Type :: pm | muc,
                          Opts :: proplists:proplist(), deps()) -> deps().
-parse_backend_opts(cassandra, Type, Opts, Deps0) ->
-    ModArch =
-        case Type of
-            pm -> mod_mam_cassandra_arch;
-            muc -> mod_mam_muc_cassandra_arch
-        end,
-
-    Deps = add_dep(ModArch, Deps0),
-
-    case proplists:get_value(user_prefs_store, Opts, false) of
-        cassandra -> add_dep(mod_mam_cassandra_prefs, [Type], Deps);
-        mnesia -> add_dep(mod_mam_mnesia_prefs, [Type], Deps);
-        _ -> Deps
-    end;
-
 parse_backend_opts(odbc, Type, Opts0, Deps0) ->
     Opts = add_default_odbc_opts(Opts0),
 
