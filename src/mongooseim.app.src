@@ -30,7 +30,7 @@
                   mnesia,
                   mochijson2,
                   % observer_cli,
-                  pa,
+                  partial,
                   poolboy,
                   public_key,
                   ranch,
