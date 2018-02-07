@@ -43,6 +43,7 @@
          terminate/2, code_change/3]).
 
 -include("ejabberd.hrl").
+-include("jlib.hrl").
 
 -record(state, {host     :: ejabberd:server(),
                 module   :: module(),
@@ -138,16 +139,39 @@ handle(Host, Module, Function, Opts, From, To, Acc, IQ) ->
 -spec process_iq(Host :: ejabberd:server(), Module :: atom(), Function :: atom(),
                  From :: ejabberd:jid(), To :: ejabberd:jid(), Acc :: mongoose_acc:t(),
                  IQ :: ejabberd:iq()) -> mongoose_acc:t() | {'error', 'lager_not_running'}.
-process_iq(_Host, Module, Function, From, To, Acc, IQ) ->
+process_iq(Host, Module, Function, From, To, Acc, IQ) ->
     case catch Module:Function(From, To, Acc, IQ) of
         {'EXIT', Reason} ->
-            ?ERROR_MSG("~p", [Reason]);
+            ejabberd_hooks:run(iq_handler_crash, Host, [From, To, IQ, Reason]),
+            send_iq_error_response(From, To, Reason, IQ),
+            ?ERROR_MSG("IQ Handler crash: ~p -> ~p - ~p : ~p",
+                       [From, To, IQ, Reason]);
         {Acc1, ignore} ->
             Acc1;
         {Acc1, ResIQ} ->
             ejabberd_router:route(To, From, Acc1,
                                   jlib:iq_to_xml(ResIQ))
     end.
+
+send_iq_error_response(From, To, Reason, IQ) ->
+    case ejabberd_config:get_local_option(iq_crash_response) of
+        error_with_dump ->
+            Error = io_lib:fwrite("~p", [Reason]),
+            ejabberd_router:route(
+              To, From,
+              make_error(IQ, ?ERRT_INTERNAL_SERVER_ERROR(?MYLANG, Error)));
+        error ->
+            ejabberd_router:route(
+              To, From,
+              make_error(IQ, ?ERR_INTERNAL_SERVER_ERROR));
+        crash ->
+            error(Reason);
+        _ ->
+            ok
+    end.
+
+make_error(IQ, Error) ->
+    jlib:iq_to_xml(IQ#iq{type = error, sub_el = Error}).
 
 -spec check_type(type()) -> type().
 

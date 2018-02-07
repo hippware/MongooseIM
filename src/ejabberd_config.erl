@@ -124,6 +124,7 @@
                     | {loglevel, _}
                     | {max_fsm_queue, _}
                     | {sasl_mechanisms, _}
+                    | {iq_crash_response, _}
                     | host_term().
 
 -type host_term() :: {acl, _, _}
@@ -591,6 +592,8 @@ process_term(Term, State) ->
             add_option(http_connections, HttpConnections, State);
         {all_metrics_are_global, Value} ->
             add_option(all_metrics_are_global, Value, State);
+        {iq_crash_response, Option} ->
+            add_option(iq_crash_response, Option, State);
         {_Opt, _Val} ->
             process_term_for_hosts_and_pools(Term, State)
     end.
