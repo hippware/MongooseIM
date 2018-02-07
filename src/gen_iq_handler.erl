@@ -143,7 +143,7 @@ process_iq(Host, Module, Function, From, To, Acc, IQ) ->
     case catch Module:Function(From, To, Acc, IQ) of
         {'EXIT', Reason} ->
             ejabberd_hooks:run(iq_handler_crash, Host, [From, To, IQ, Reason]),
-            send_iq_error_response(From, To, Reason, IQ),
+            send_iq_error_response(From, To, Acc, IQ, Reason),
             ?ERROR_MSG("IQ Handler crash: ~p -> ~p - ~p : ~p",
                        [From, To, IQ, Reason]);
         {Acc1, ignore} ->
@@ -153,21 +153,21 @@ process_iq(Host, Module, Function, From, To, Acc, IQ) ->
                                   jlib:iq_to_xml(ResIQ))
     end.
 
-send_iq_error_response(From, To, Reason, IQ) ->
+send_iq_error_response(From, To, Acc, IQ, Reason) ->
     case ejabberd_config:get_local_option(iq_crash_response) of
         error_with_dump ->
             Error = io_lib:fwrite("~p", [Reason]),
             ejabberd_router:route(
-              To, From,
+              To, From, Acc,
               make_error(IQ, ?ERRT_INTERNAL_SERVER_ERROR(?MYLANG, Error)));
         error ->
             ejabberd_router:route(
-              To, From,
+              To, From, Acc,
               make_error(IQ, ?ERR_INTERNAL_SERVER_ERROR));
         crash ->
             error(Reason);
         _ ->
-            ok
+            Acc
     end.
 
 make_error(IQ, Error) ->
