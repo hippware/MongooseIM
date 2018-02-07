@@ -97,6 +97,9 @@
 -type broadcast_type() :: {exit, Reason :: binary()}
                         | {item, IJID :: ejabberd:simple_jid() | ejabberd:jid(),
                            ISubscription :: from | to | both | none | remove}
+                        | {item, IJID :: ejabberd:simple_jid() | ejabberd:jid(),
+                           ISubscription :: from | to | both | none | remove,
+                           OldItem :: term(), NewItem :: term()}
                         | {privacy_list, PrivList :: mongoose_privacy:userlist(),
                            PrivListName :: binary()}
                         | {blocking, UserList :: mongoose_privacy:userlist(), What :: blocking_type(),
