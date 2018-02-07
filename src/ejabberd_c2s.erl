@@ -2281,7 +2281,7 @@ roster_change(Acc, IJID, ISubscription, OldItem, NewItem, StateData) ->
             From = StateData#state.jid,
             To = jid:make(IJID),
 
-            case contact_blocking_change(StateData, From, To, OldItem, NewItem) of
+            case contact_blocking_change(Acc, From, To, OldItem, NewItem, StateData) of
                 blocked ->
                     % Changes that cause contacts to be newly blocked by privacy
                     % lists should generate an unavailable message for that
@@ -2674,28 +2674,29 @@ send_unavail_if_newly_blocked(Acc, _, _, _, _, _) ->
 %----------------------------------------------------------------------
 % Called when a roster item is updated
 %----------------------------------------------------------------------
-contact_blocking_change(_, _, _, OldItem, NewItem)
+contact_blocking_change(_, _, _, OldItem, NewItem, _)
   when OldItem =:= none;
        NewItem =:= none ->
     none;
-contact_blocking_change(StateData, From, To, OldItem, NewItem) ->
-    OldResult = privacy_check_packet_roster(StateData, From, To, OldItem),
-    NewResult = privacy_check_packet_roster(StateData, From, To, NewItem),
+contact_blocking_change(Acc, From, To, OldItem, NewItem, StateData) ->
+    OldResult = privacy_check_packet_roster(Acc, From, To, OldItem, StateData),
+    NewResult = privacy_check_packet_roster(Acc, From, To, NewItem, StateData),
     case {OldResult, NewResult} of
         {allow, deny} -> blocked;
         {deny, allow} -> unblocked;
         _ -> none
     end.
 
-privacy_check_packet_roster(StateData, From, To, Item) ->
-    ejabberd_hooks:run_fold(
-      privacy_check_packet_with_roster, StateData#state.server,
-      allow,
-      [StateData#state.user,
-       StateData#state.server,
-       StateData#state.privacy_list,
-       {From, To, <<"presence">>, <<"unavailable">>},
-       out, Item]).
+privacy_check_packet_roster(Acc, From, To, Item, StateData) ->
+    Acc1 = ejabberd_hooks:run_fold(
+             privacy_check_packet_with_roster, StateData#state.server,
+             mongoose_acc:put(result, allow, Acc),
+             [StateData#state.user,
+              StateData#state.server,
+              StateData#state.privacy_list,
+              {From, To, <<"presence">>, <<"unavailable">>},
+              out, Item]),
+    mongoose_acc:get(result, Acc1).
 
 %%%----------------------------------------------------------------------
 %%% XEP-0191
