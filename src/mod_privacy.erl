@@ -312,18 +312,18 @@ get_user_list(_, User, Server) ->
             #userlist{}
     end.
 
-check_packet_with_roster(Acc, User, Server, UserList, {From, To, Packet}, Dir,
+check_packet_with_roster(Acc, User, Server, UserList, Packet, Dir,
                          #roster{subscription = Sub, groups = Groups}) ->
     % Set needdb to false to force use of the supplied roster data rather
     % than reloading it:
     check_packet(Acc, User, Server, UserList#userlist{needdb = false},
-                 {From, To, Packet}, Dir, Sub, Groups).
+                 Packet, Dir, Sub, Groups).
 
 %% From is the sender, To is the destination.
 %% If Dir = out, User@Server is the sender account (From).
 %% If Dir = in, User@Server is the destination account (To).
-check_packet(Acc, User, Server, UserList, {From, To, Packet}, Dir) ->
-    check_packet(Acc, User, Server, UserList, {From, To, Packet}, Dir, [], []).
+check_packet(Acc, User, Server, UserList, Packet, Dir) ->
+    check_packet(Acc, User, Server, UserList, Packet, Dir, [], []).
 
 check_packet(Acc, User, Server,
          #userlist{list = List, needdb = NeedDb},

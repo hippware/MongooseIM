@@ -2694,7 +2694,7 @@ privacy_check_packet_roster(StateData, From, To, Item) ->
       [StateData#state.user,
        StateData#state.server,
        StateData#state.privacy_list,
-       {From, To, unavailable_packet()},
+       {From, To, <<"presence">>, <<"unavailable">>},
        out, Item]).
 
 %%%----------------------------------------------------------------------
