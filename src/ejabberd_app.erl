@@ -59,8 +59,6 @@ start(normal, _Args) ->
     mongoose_deprecations:start(),
     {ok, _} = Sup = ejabberd_sup:start_link(),
     ejabberd_rdbms:start(),
-    mongoose_riak:start(),
-    mongoose_cassandra:start(),
     mongoose_http_client:start(),
     ejabberd_auth:start(),
     cyrsasl:start(),
