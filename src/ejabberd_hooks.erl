@@ -120,13 +120,13 @@ delete(Hooks) when is_list(Hooks) ->
 %% @doc Run the calls of this hook in order, don't care about function results.
 %% If a call returns stop, no more calls are performed.
 -spec run(Hook :: atom(),
-          Args :: [any()]) -> ok.
+          Args :: [any()]) -> mongoose_acc:t() | stopped.
 run(Hook, Args) ->
     run_fold(Hook, global, #{}, Args).
 
 -spec run(Hook :: atom(),
           Host :: ejabberd:server() | global,
-          Args :: [any()]) -> ok.
+          Args :: [any()]) -> mongoose_acc:t() | stopped.
 run(Hook, Host, Args) ->
     run_fold(Hook, Host, mongoose_acc:new(), Args).
 
