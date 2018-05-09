@@ -246,13 +246,14 @@ check_in_subscription(Acc, User, Server, _JID, _Type, _Reason) ->
       To :: ejabberd:jid(),
       Packet :: jlib:xmlel().
 bounce_offline_message(Acc, #jid{server = Server} = From, To, Packet) ->
-    Acc1 = ejabberd_hooks:run_fold(xmpp_bounce_message,
+    Acc1 = mongoose_acc:put(server, Server, Acc),
+    Acc2 = ejabberd_hooks:run_fold(xmpp_bounce_message,
                             Server,
-                            Acc,
+                            Acc1,
                             []),
     Err = jlib:make_error_reply(Packet, ?ERR_SERVICE_UNAVAILABLE),
-    Acc2 = ejabberd_router:route(To, From, Acc1, Err),
-    {stop, Acc2}.
+    Acc3 = ejabberd_router:route(To, From, Acc2, Err),
+    {stop, Acc3}.
 
 -spec disconnect_removed_user(mongoose_acc:t(), User :: ejabberd:user(),
                               Server :: ejabberd:server()) -> mongoose_acc:t().
